@@ -17,7 +17,7 @@ import uuid
 from configparser import ConfigParser
 from pathlib import Path
 
-__all__ = ['ColumnType', 'Node', 'parser']
+__all__ = ['ColumnType', 'Node']
 
 
 class ColumnType(enum.Enum):
@@ -29,26 +29,6 @@ class ColumnType(enum.Enum):
     StringID = '$cat'
     IntegerID = '$id'
     Text = '$text'
-
-
-class _DefaultIni:
-    ConfigParser.optionxform = str  # make case-sensitive
-
-    @staticmethod
-    def loads(s):
-        cp = ConfigParser(allow_no_value=True)
-        cp.read_string(s)
-        return dict(cp['DEFAULT'])
-
-    @staticmethod
-    def dumps(d):
-        buf = io.StringIO()
-        ConfigParser(defaults=d).write(buf)
-        buf.seek(0)
-        return buf.read()
-
-
-parser = _DefaultIni  # todo
 
 
 class Node:
@@ -84,7 +64,7 @@ class Node:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._flush()  # won't have effect when the scraper is cancelled by user
         if exc_type is KeyboardInterrupt:
-            logging.warning('User aborted execution')
+            logging.warning('User aborted the scraper execution')
             return True
         elif exc_type is _RowsLimitExceeded:
             logging.warning(f'The scraper exceeded the rows limit: {self._cfg["maximum_rows"]}')
@@ -152,6 +132,23 @@ class _RowsLimitExceeded(BaseException):
     pass
 
 
+class _Ini:
+    ConfigParser.optionxform = str  # make case-sensitive
+
+    @staticmethod
+    def loads(s):
+        cp = ConfigParser(allow_no_value=True)
+        cp.read_string(s)
+        return dict(cp['DEFAULT'])
+
+    @staticmethod
+    def dumps(d):
+        buf = io.StringIO()
+        ConfigParser(defaults=d).write(buf)
+        buf.seek(0)
+        return buf.read()
+
+
 def _handle_cli(description, columns, parameters, reset_url_semantic):
     # define cli
     cli = argparse.ArgumentParser(add_help=False, description='A web scraper for PolyAnalyst')
@@ -179,7 +176,7 @@ def _handle_cli(description, columns, parameters, reset_url_semantic):
 
     if not (args.help or args.features):  # main run
         data = json.load(args.file)
-        data['params'] = parser.loads(data['params'])
+        data['params'] = _Ini.loads(data['params'])
         args.file.close()
         return data
 
@@ -193,11 +190,11 @@ def _handle_cli(description, columns, parameters, reset_url_semantic):
     if args.features:
         if callable(columns):
             _params = json.load(args.file)['params']
-            columns = columns(parser.loads(_params))
+            columns = columns(_Ini.loads(_params))
 
         features = {
             'columns': [{'name': k, 'type': v.value} for k, v in columns.items()],
-            'params': parser.dumps(parameters),
+            'params': _Ini.dumps(parameters),
             'reset_url_semantic': reset_url_semantic,
         }
         json.dump(features, args.file)

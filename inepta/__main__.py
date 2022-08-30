@@ -76,6 +76,7 @@ class Node:
             while not stop_file.exists():
                 time.sleep(1)
             _thread.interrupt_main()
+
         threading.Thread(target=_wait, daemon=True).start()
 
         return self
@@ -122,12 +123,14 @@ class Node:
         if isinstance(content, str):
             content = content.encode()
 
-        self._buffer.append({
-            'url': url,
-            'title': title,
-            'content': base64.standard_b64encode(content).decode('ascii'),
-            'columns': columns,
-        })
+        self._buffer.append(
+            {
+                'url': url,
+                'title': title,
+                'content': base64.standard_b64encode(content).decode('ascii'),
+                'columns': columns,
+            }
+        )
         self._quota -= 1
         if not self._quota > 0:
             raise _RowsLimitExceeded
@@ -152,11 +155,7 @@ class _RowsLimitExceeded(BaseException):
 def _handle_cli(description, columns, parameters, reset_url_semantic):
     # define cli
     cli = argparse.ArgumentParser(add_help=False, description='A web scraper for PolyAnalyst')
-    cli.add_argument(
-        '-h',
-        action='help',
-        help='show this help message and exit'
-    )
+    cli.add_argument('-h', action='help', help='show this help message and exit')
     cli.add_argument(
         dest='file',
         metavar='FILE',
@@ -178,7 +177,7 @@ def _handle_cli(description, columns, parameters, reset_url_semantic):
     # handle cli
     args = cli.parse_args()
 
-    if not(args.help or args.features):  # main run
+    if not (args.help or args.features):  # main run
         data = json.load(args.file)
         data['params'] = parser.loads(data['params'])
         args.file.close()
